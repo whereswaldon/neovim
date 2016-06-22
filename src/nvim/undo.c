@@ -7,7 +7,7 @@
 ///                                                            V
 ///                +--------------+    +--------------+    +--------------+
 /// b_u_newhead--->| u_header     |    | u_header     |    | u_header     |
-///                |     uh_next------>|     uh_next------>|     uh_next---->NULL
+///                |     uh_next------>|     uh_next------>|     uh_next---->NULL // NOLINT
 ///         NULL<--------uh_prev  |<---------uh_prev  |<---------uh_prev  |
 ///                |     uh_entry |    |     uh_entry |    |     uh_entry |
 ///                +--------|-----+    +--------|-----+    +--------|-----+
@@ -112,7 +112,7 @@ static long u_oldcount;
 
 /// When 'u' flag included in 'cpoptions', we behave like vi.  Need to remember
 /// the action that "u" should do.
-static int undo_undoes = FALSE;
+static int undo_undoes = false;
 
 static int lastmark = 0;
 
@@ -145,7 +145,7 @@ static void u_check_tree(u_header_T *uhp,
   if (uhp->uh_magic != UH_MAGIC) {
     EMSG("uh_magic wrong (may be using freed memory)");
   } else {
-    /// Check pointers back are correct.
+    // Check pointers back are correct.
     if (uhp->uh_next.ptr != exp_uh_next) {
       EMSG("uh_next wrong");
       smsg("expected: 0x%x, actual: 0x%x", exp_uh_next, uhp->uh_next.ptr);
@@ -156,7 +156,7 @@ static void u_check_tree(u_header_T *uhp,
            exp_uh_alt_prev, uhp->uh_alt_prev.ptr);
     }
 
-    /// Check the undo tree at this header.
+    // Check the undo tree at this header.
     for (uep = uhp->uh_entry; uep != NULL; uep = uep->ue_next) {
       if (uep->ue_magic != UE_MAGIC) {
         EMSG("ue_magic wrong (may be using freed memory)");
@@ -164,14 +164,15 @@ static void u_check_tree(u_header_T *uhp,
       }
     }
 
-    /// Check the next alt tree.
+    // Check the next alt tree.
     u_check_tree(uhp->uh_alt_next.ptr, uhp->uh_next.ptr, uhp);
 
-    /// Check the next header in this branch.
+    // Check the next header in this branch.
     u_check_tree(uhp->uh_prev.ptr, uhp, NULL);
   }
 }
 
+// TODO(christopher.waldon.dev@gmail.com): document this function.
 static void u_check(int newhead_may_be_NULL)                 {
   seen_b_u_newhead = 0;
   seen_b_u_curhead = 0;
@@ -180,24 +181,26 @@ static void u_check(int newhead_may_be_NULL)                 {
   u_check_tree(curbuf->b_u_oldhead, NULL, NULL);
 
   if (seen_b_u_newhead == 0 && curbuf->b_u_oldhead != NULL
-      && !(newhead_may_be_NULL && curbuf->b_u_newhead == NULL))
+      && !(newhead_may_be_NULL && curbuf->b_u_newhead == NULL)) {
     EMSGN("b_u_newhead invalid: 0x%x", curbuf->b_u_newhead);
-  if (curbuf->b_u_curhead != NULL && seen_b_u_curhead == 0)
+  }
+  if (curbuf->b_u_curhead != NULL && seen_b_u_curhead == 0) {
     EMSGN("b_u_curhead invalid: 0x%x", curbuf->b_u_curhead);
+  }
   if (header_count != curbuf->b_u_numhead) {
     EMSG("b_u_numhead invalid");
     smsg("expected: %" PRId64 ", actual: %" PRId64,
-        (int64_t)header_count, (int64_t)curbuf->b_u_numhead);
+         (int64_t)header_count, (int64_t)curbuf->b_u_numhead);
   }
 }
 
 #endif
 
-/*
- * Save the current line for both the "u" and "U" command.
- * Careful: may trigger autocommands that reload the buffer.
- * Returns OK or FAIL.
- */
+/// Save the current line for both the "u" and "U" command.
+///
+/// Careful: may trigger autocommands that reload the buffer.
+///
+/// @return OK or FAIL.
 int u_save_cursor(void)
 {
   linenr_T cur = curwin->w_cursor.lnum;
@@ -207,69 +210,78 @@ int u_save_cursor(void)
   return u_save(top, bot);
 }
 
-/*
- * Save the lines between "top" and "bot" for both the "u" and "U" command.
- * "top" may be 0 and bot may be curbuf->b_ml.ml_line_count + 1.
- * Careful: may trigger autocommands that reload the buffer.
- * Returns FAIL when lines could not be saved, OK otherwise.
- */
+/// Save the lines between "top" and "bot" for both the "u" and "U" command.
+///
+/// "top" may be 0 and bot may be curbuf->b_ml.ml_line_count + 1.
+/// Careful: may trigger autocommands that reload the buffer.
+///
+/// @param top the line number at the top of the saved region.
+/// @param bot the line number at the bottom of the saved region.
+///
+/// @return FAIL when lines could not be saved, OK otherwise.
 int u_save(linenr_T top, linenr_T bot)
 {
-  if (undo_off)
+  if (undo_off) {
     return OK;
-
-  if (top >= bot || bot > (curbuf->b_ml.ml_line_count + 1)) {
-    return FAIL;        /* rely on caller to do error messages */
   }
-
-  if (top + 2 == bot)
+  if (top >= bot || bot > (curbuf->b_ml.ml_line_count + 1)) {
+    return FAIL;  // rely on caller to do error messages
+  }
+  if (top + 2 == bot) {
     u_saveline((linenr_T)(top + 1));
-
-  return u_savecommon(top, bot, (linenr_T)0, FALSE);
+  }
+  return u_savecommon(top, bot, (linenr_T)0, false);
 }
 
-/*
- * Save the line "lnum" (used by ":s" and "~" command).
- * The line is replaced, so the new bottom line is lnum + 1.
- * Careful: may trigger autocommands that reload the buffer.
- * Returns FAIL when lines could not be saved, OK otherwise.
- */
+/// Save the line "lnum" (used by ":s" and "~" command).
+///
+/// The line is replaced, so the new bottom line is lnum + 1.
+/// Careful: may trigger autocommands that reload the buffer.
+///
+/// @param lnum the number of the line to be saved.
+///
+/// @return FAIL when lines could not be saved, OK otherwise.
 int u_savesub(linenr_T lnum)
 {
-  if (undo_off)
+  if (undo_off) {
     return OK;
-
-  return u_savecommon(lnum - 1, lnum + 1, lnum + 1, FALSE);
+  }
+  return u_savecommon(lnum - 1, lnum + 1, lnum + 1, false);
 }
 
-/*
- * A new line is inserted before line "lnum" (used by :s command).
- * The line is inserted, so the new bottom line is lnum + 1.
- * Careful: may trigger autocommands that reload the buffer.
- * Returns FAIL when lines could not be saved, OK otherwise.
- */
+/// A new line is inserted before line "lnum" (used by :s command).
+///
+/// The line is inserted, so the new bottom line is lnum + 1.
+/// Careful: may trigger autocommands that reload the buffer.
+///
+/// @param lnum TODO(christopher.waldon.dev): explain
+///
+/// @return FAIL when lines could not be saved, OK otherwise.
 int u_inssub(linenr_T lnum)
 {
-  if (undo_off)
+  if (undo_off) {
     return OK;
-
-  return u_savecommon(lnum - 1, lnum, lnum + 1, FALSE);
+  }
+  return u_savecommon(lnum - 1, lnum, lnum + 1, false);
 }
 
-/*
- * Save the lines "lnum" - "lnum" + nlines (used by delete command).
- * The lines are deleted, so the new bottom line is lnum, unless the buffer
- * becomes empty.
- * Careful: may trigger autocommands that reload the buffer.
- * Returns FAIL when lines could not be saved, OK otherwise.
- */
+/// Save the lines "lnum" - "lnum" + nlines (used by delete command).
+///
+/// The lines are deleted, so the new bottom line is lnum, unless the buffer
+/// becomes empty.
+/// Careful: may trigger autocommands that reload the buffer.
+///
+/// @param lnum the line number at the beginning of the saved region.
+/// @param nlines the number of lines to be saved.
+///
+/// @return FAIL when lines could not be saved, OK otherwise.
 int u_savedel(linenr_T lnum, long nlines)
 {
-  if (undo_off)
+  if (undo_off) {
     return OK;
-
+  }
   return u_savecommon(lnum - 1, lnum + nlines,
-      nlines == curbuf->b_ml.ml_line_count ? 2 : lnum, FALSE);
+                      nlines == curbuf->b_ml.ml_line_count ? 2 : lnum, false);
 }
 
 /// Return true when undo is allowed. Otherwise print an error message and
@@ -278,7 +290,7 @@ int u_savedel(linenr_T lnum, long nlines)
 /// @return true if undo is allowed.
 bool undo_allowed(void)
 {
-  /* Don't allow changes when 'modifiable' is off.  */
+  // Don't allow changes when 'modifiable' is off.
   if (!MODIFIABLE(curbuf)) {
     EMSG(_(e_modifiable));
     return false;
@@ -290,8 +302,8 @@ bool undo_allowed(void)
     return false;
   }
 
-  /* Don't allow changes in the buffer while editing the cmdline.  The
-   * caller of getcmdline() may get confused. */
+  // Don't allow changes in the buffer while editing the cmdline. The
+  // caller of getcmdline() may get confused.
   if (textlock != 0) {
     EMSG(_(e_secure));
     return false;
@@ -300,19 +312,21 @@ bool undo_allowed(void)
   return true;
 }
 
-/*
- * Get the undolevle value for the current buffer.
- */
+/// Get the undolevel value for the current buffer.
+///
+/// @return the undolevel value for the current buffer.
 static long get_undolevel(void)
 {
   if (curbuf->terminal) {
     return -1;
   }
-  if (curbuf->b_p_ul == NO_LOCAL_UNDOLEVEL)
+  if (curbuf->b_p_ul == NO_LOCAL_UNDOLEVEL) {
     return p_ul;
+  }
   return curbuf->b_p_ul;
 }
 
+/// TODO(christopher.waldon.dev@gmail.com): Document this function
 static inline void zero_fmark_additional_data(fmark_T *fmarks)
 {
   for (size_t i = 0; i < NMARKS; i++) {
@@ -321,15 +335,16 @@ static inline void zero_fmark_additional_data(fmark_T *fmarks)
   }
 }
 
-/*
- * Common code for various ways to save text before a change.
- * "top" is the line above the first changed line.
- * "bot" is the line below the last changed line.
- * "newbot" is the new bottom line.  Use zero when not known.
- * "reload" is TRUE when saving for a buffer reload.
- * Careful: may trigger autocommands that reload the buffer.
- * Returns FAIL when lines could not be saved, OK otherwise.
- */
+/// Common code for various ways to save text before a change.
+///
+/// Careful: may trigger autocommands that reload the buffer.
+///
+/// @param top is the line above the first changed line.
+/// @param bot is the line below the last changed line.
+/// @param newbot is the new bottom line. Use zero when not known.
+/// @param reload is TRUE when saving for a buffer reload.
+///
+/// @return FAIL when lines could not be saved, OK otherwise.
 int u_savecommon(linenr_T top, linenr_T bot, linenr_T newbot, int reload)
 {
   linenr_T lnum;
@@ -341,22 +356,20 @@ int u_savecommon(linenr_T top, linenr_T bot, linenr_T newbot, int reload)
   long size;
 
   if (!reload) {
-    /* When making changes is not allowed return FAIL.  It's a crude way
-     * to make all change commands fail. */
-    if (!undo_allowed())
+    // When making changes is not allowed return FAIL. It's a crude way
+    // to make all change commands fail.
+    if (!undo_allowed()) {
       return FAIL;
+    }
 
-
-    /*
-     * Saving text for undo means we are going to make a change.  Give a
-     * warning for a read-only file before making the change, so that the
-     * FileChangedRO event can replace the buffer with a read-write version
-     * (e.g., obtained from a source control system).
-     */
+    // Saving text for undo means we are going to make a change.  Give a
+    // warning for a read-only file before making the change, so that the
+    // FileChangedRO event can replace the buffer with a read-write version
+    // (e.g., obtained from a source control system).
     change_warning(0);
     if (bot > curbuf->b_ml.ml_line_count + 1) {
-      /* This happens when the FileChangedRO autocommand changes the
-       * file in a way it becomes shorter. */
+      // This happens when the FileChangedRO autocommand changes the
+      // file in a way it becomes shorter.
       EMSG(_("E881: Line count changed unexpectedly"));
       return FAIL;
     }
