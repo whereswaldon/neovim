@@ -1,76 +1,74 @@
-/*
- * undo.c: multi level undo facility
- *
- * The saved lines are stored in a list of lists (one for each buffer):
- *
- * b_u_oldhead------------------------------------------------+
- *                                                            |
- *                                                            V
- *                +--------------+    +--------------+    +--------------+
- * b_u_newhead--->| u_header     |    | u_header     |    | u_header     |
- *                |     uh_next------>|     uh_next------>|     uh_next---->NULL
- *         NULL<--------uh_prev  |<---------uh_prev  |<---------uh_prev  |
- *                |     uh_entry |    |     uh_entry |    |     uh_entry |
- *                +--------|-----+    +--------|-----+    +--------|-----+
- *                         |                   |                   |
- *                         V                   V                   V
- *                +--------------+    +--------------+    +--------------+
- *                | u_entry      |    | u_entry      |    | u_entry      |
- *                |     ue_next  |    |     ue_next  |    |     ue_next  |
- *                +--------|-----+    +--------|-----+    +--------|-----+
- *                         |                   |                   |
- *                         V                   V                   V
- *                +--------------+            NULL                NULL
- *                | u_entry      |
- *                |     ue_next  |
- *                +--------|-----+
- *                         |
- *                         V
- *                        etc.
- *
- * Each u_entry list contains the information for one undo or redo.
- * curbuf->b_u_curhead points to the header of the last undo (the next redo),
- * or is NULL if nothing has been undone (end of the branch).
- *
- * For keeping alternate undo/redo branches the uh_alt field is used.  Thus at
- * each point in the list a branch may appear for an alternate to redo.  The
- * uh_seq field is numbered sequentially to be able to find a newer or older
- * branch.
- *
- *                 +---------------+    +---------------+
- * b_u_oldhead --->| u_header      |    | u_header      |
- *                 |   uh_alt_next ---->|   uh_alt_next ----> NULL
- *         NULL <----- uh_alt_prev |<------ uh_alt_prev |
- *                 |   uh_prev     |    |   uh_prev     |
- *                 +-----|---------+    +-----|---------+
- *                       |                    |
- *                       V                    V
- *                 +---------------+    +---------------+
- *                 | u_header      |    | u_header      |
- *                 |   uh_alt_next |    |   uh_alt_next |
- * b_u_newhead --->|   uh_alt_prev |    |   uh_alt_prev |
- *                 |   uh_prev     |    |   uh_prev     |
- *                 +-----|---------+    +-----|---------+
- *                       |                    |
- *                       V                    V
- *                     NULL             +---------------+    +---------------+
- *                                      | u_header      |    | u_header      |
- *                                      |   uh_alt_next ---->|   uh_alt_next |
- *                                      |   uh_alt_prev |<------ uh_alt_prev |
- *                                      |   uh_prev     |    |   uh_prev     |
- *                                      +-----|---------+    +-----|---------+
- *                                            |                    |
- *                                           etc.                 etc.
- *
- *
- * All data is allocated and will all be freed when the buffer is unloaded.
- */
+/// undo.c: multi level undo facility
+///
+/// The saved lines are stored in a list of lists (one for each buffer):
+///
+/// b_u_oldhead------------------------------------------------+
+///                                                            |
+///                                                            V
+///                +--------------+    +--------------+    +--------------+
+/// b_u_newhead--->| u_header     |    | u_header     |    | u_header     |
+///                |     uh_next------>|     uh_next------>|     uh_next---->NULL
+///         NULL<--------uh_prev  |<---------uh_prev  |<---------uh_prev  |
+///                |     uh_entry |    |     uh_entry |    |     uh_entry |
+///                +--------|-----+    +--------|-----+    +--------|-----+
+///                         |                   |                   |
+///                         V                   V                   V
+///                +--------------+    +--------------+    +--------------+
+///                | u_entry      |    | u_entry      |    | u_entry      |
+///                |     ue_next  |    |     ue_next  |    |     ue_next  |
+///                +--------|-----+    +--------|-----+    +--------|-----+
+///                         |                   |                   |
+///                         V                   V                   V
+///                +--------------+            NULL                NULL
+///                | u_entry      |
+///                |     ue_next  |
+///                +--------|-----+
+///                         |
+///                         V
+///                        etc.
+///
+/// Each u_entry list contains the information for one undo or redo.
+/// curbuf->b_u_curhead points to the header of the last undo (the next redo),
+/// or is NULL if nothing has been undone (end of the branch).
+///
+/// For keeping alternate undo/redo branches the uh_alt field is used.  Thus at
+/// each point in the list a branch may appear for an alternate to redo.  The
+/// uh_seq field is numbered sequentially to be able to find a newer or older
+/// branch.
+///
+///                 +---------------+    +---------------+
+/// b_u_oldhead --->| u_header      |    | u_header      |
+///                 |   uh_alt_next ---->|   uh_alt_next ----> NULL
+///         NULL <----- uh_alt_prev |<------ uh_alt_prev |
+///                 |   uh_prev     |    |   uh_prev     |
+///                 +-----|---------+    +-----|---------+
+///                       |                    |
+///                       V                    V
+///                 +---------------+    +---------------+
+///                 | u_header      |    | u_header      |
+///                 |   uh_alt_next |    |   uh_alt_next |
+/// b_u_newhead --->|   uh_alt_prev |    |   uh_alt_prev |
+///                 |   uh_prev     |    |   uh_prev     |
+///                 +-----|---------+    +-----|---------+
+///                       |                    |
+///                       V                    V
+///                     NULL             +---------------+    +---------------+
+///                                      | u_header      |    | u_header      |
+///                                      |   uh_alt_next ---->|   uh_alt_next |
+///                                      |   uh_alt_prev |<------ uh_alt_prev |
+///                                      |   uh_prev     |    |   uh_prev     |
+///                                      +-----|---------+    +-----|---------+
+///                                            |                    |
+///                                           etc.                 etc.
+///
+///
+/// All data is allocated and will all be freed when the buffer is unloaded.
 
-/* Uncomment the next line for including the u_check() function.  This warns
- * for errors in the debug information. */
-/* #define U_DEBUG 1 */
-#define UH_MAGIC 0x18dade       /* value for uh_magic when in use */
-#define UE_MAGIC 0xabc123       /* value for ue_magic when in use */
+/// Uncomment the next line for including the u_check() function.  This warns
+/// for errors in the debug information. */
+/// #define U_DEBUG 1 */
+#define UH_MAGIC 0x18dade  /// value for uh_magic when in use
+#define UE_MAGIC 0xabc123  /// value for ue_magic when in use
 
 #include <assert.h>
 #include <inttypes.h>
@@ -108,34 +106,34 @@
 # include "undo.c.generated.h"
 #endif
 
-/* used in undo_end() to report number of added and deleted lines */
-static long u_newcount, u_oldcount;
+/// used in undo_end() to report number of added and deleted lines
+static long u_newcount;
+static long u_oldcount;
 
-/*
- * When 'u' flag included in 'cpoptions', we behave like vi.  Need to remember
- * the action that "u" should do.
- */
+/// When 'u' flag included in 'cpoptions', we behave like vi.  Need to remember
+/// the action that "u" should do.
 static int undo_undoes = FALSE;
 
 static int lastmark = 0;
 
 #if defined(U_DEBUG)
-/*
- * Check the undo structures for being valid.  Print a warning when something
- * looks wrong.
- */
+/// Check the undo structures for being valid.  Print a warning when something
+/// looks wrong.
 static int seen_b_u_curhead;
 static int seen_b_u_newhead;
 static int header_count;
 
+// TODO(christopher.waldon.dev@gmail.com): document this function.
 static void u_check_tree(u_header_T *uhp,
-    u_header_T *exp_uh_next,
-    u_header_T *exp_uh_alt_prev) {
+                         u_header_T *exp_uh_next,
+                         u_header_T *exp_uh_alt_prev)
+{
   u_entry_T *uep;
 
-  if (uhp == NULL)
+  if (uhp == NULL) {
     return;
-  ++header_count;
+  }
+  header_count++;
   if (uhp == curbuf->b_u_curhead && ++seen_b_u_curhead > 1) {
     EMSG("b_u_curhead found twice (looping?)");
     return;
@@ -144,23 +142,21 @@ static void u_check_tree(u_header_T *uhp,
     EMSG("b_u_newhead found twice (looping?)");
     return;
   }
-
-  if (uhp->uh_magic != UH_MAGIC)
+  if (uhp->uh_magic != UH_MAGIC) {
     EMSG("uh_magic wrong (may be using freed memory)");
-  else {
-    /* Check pointers back are correct. */
+  } else {
+    /// Check pointers back are correct.
     if (uhp->uh_next.ptr != exp_uh_next) {
       EMSG("uh_next wrong");
-      smsg("expected: 0x%x, actual: 0x%x",
-          exp_uh_next, uhp->uh_next.ptr);
+      smsg("expected: 0x%x, actual: 0x%x", exp_uh_next, uhp->uh_next.ptr);
     }
     if (uhp->uh_alt_prev.ptr != exp_uh_alt_prev) {
       EMSG("uh_alt_prev wrong");
       smsg("expected: 0x%x, actual: 0x%x",
-          exp_uh_alt_prev, uhp->uh_alt_prev.ptr);
+           exp_uh_alt_prev, uhp->uh_alt_prev.ptr);
     }
 
-    /* Check the undo tree at this header. */
+    /// Check the undo tree at this header.
     for (uep = uhp->uh_entry; uep != NULL; uep = uep->ue_next) {
       if (uep->ue_magic != UE_MAGIC) {
         EMSG("ue_magic wrong (may be using freed memory)");
@@ -168,10 +164,10 @@ static void u_check_tree(u_header_T *uhp,
       }
     }
 
-    /* Check the next alt tree. */
+    /// Check the next alt tree.
     u_check_tree(uhp->uh_alt_next.ptr, uhp->uh_next.ptr, uhp);
 
-    /* Check the next header in this branch. */
+    /// Check the next header in this branch.
     u_check_tree(uhp->uh_prev.ptr, uhp, NULL);
   }
 }
@@ -2612,7 +2608,7 @@ static u_entry_T *u_get_headentry(void)
 
 /*
  * u_getbot(): compute the line number of the previous u_save
- *		It is called only when b_u_synced is false.
+ *    It is called only when b_u_synced is false.
  */
 static void u_getbot(void)
 {
